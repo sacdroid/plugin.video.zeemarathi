@@ -20,13 +20,11 @@ def build_url(query):
     return base_url + '?' + urllib.urlencode(query)
 
 
-def add_dir(name, url, mode, icon_image="DefaultFolder.png", description="", is_folder=True, background=None):
+def add_dir(name, url, mode, icon_image='DefaultFolder.png', is_folder=True, background=None):
     global addon_handle
 
     u = build_url({'url': urllib.quote(url, safe=''), 'mode': str(mode), 'name': urllib.quote(name, safe='')})
-    # u = build_url({'url': urllib.quote_plus(url), 'mode': str(mode), 'name': urllib.quote_plus(name)})
     liz = xbmcgui.ListItem(unicode(name), iconImage=icon_image, thumbnailImage=icon_image)
-    # liz.setInfo(type="Video", infoLabels={"title": name, "plot": "viraj"})
 
     ok = xbmcplugin.addDirectoryItem(handle=addon_handle, url=u, listitem=liz, isFolder=is_folder)
 
@@ -56,24 +54,30 @@ def get_episodes(url):
 
         episode_url = li.find('div', {'class': lambda x: x and 'video-watch' in x.split()}).find('a')['href']
         name = li.find('div', {'class': 'video-episode'}).text
-        img_src = li.find('img')['src']
+        img_src = 'DefaultFolder.png'
+        img = li.find('img')
+        if img:
+            img_src = img['src']
 
         episodes.append({'name': name, 'url': episode_url, 'mode': 'episode', 'icon_image': img_src})
 
-    next_link = soup.find('ul', {'class': lambda x: x and 'pager' in x.split()}).find('li', {'class': lambda x: x and 'pager-next' in x.split()})
-    if next_link:
-        next_url = next_link.find('a')['href']
-        episodes += get_episodes(ZEEMARATHI_REFERRER + next_url)
+    pager = soup.find('ul', {'class': lambda x: x and 'pager' in x.split()})
+    if pager:
+        next_link = pager.find('li', {'class': lambda x: x and 'pager-next' in x.split()})
+        if next_link:
+            next_url = next_link.find('a')['href']
+            episodes += get_episodes(ZEEMARATHI_REFERRER + next_url)
 
     return episodes
 
 addon_id = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+print addon_id
 base_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
 args = urlparse.parse_qs(sys.argv[2][1:])
 mode = args.get('mode', [''])[0]
 
-addon_data_dir = os.path.join(xbmc.translatePath("special://userdata/addon_data").decode("utf-8"), addon_id)
+addon_data_dir = os.path.join(xbmc.translatePath('special://userdata/addon_data').decode('utf-8'), addon_id)
 if not os.path.exists(addon_data_dir):
     os.makedirs(addon_data_dir)
 
@@ -102,20 +106,14 @@ elif mode == 'episode':
 
     script = soup.find('div', {'id': 'block-gec-videos-videopage-videos'}).find('script')
 
-    master_m3u8 = script.text.split('babyenjoying = ', 2)[2].split(";")[0][1:-1]
+    master_m3u8 = script.text.split('babyenjoying = ', 2)[2].split(';')[0][1:-1]
+    
+    plot = soup.find('p', {'itemprop': 'description'}).text
+    thumbnail = soup.find('meta', {'itemprop': 'thumbnailUrl'})['content']
 
-    # name, url, mode, icon_image="DefaultFolder.png", description="", is_folder=True, background=None):
-    add_dir(name, master_m3u8, 'play', icon_image="DefaultVideo.png", is_folder=False)
-
-elif mode == 'play':
-    url = urllib.unquote(args['url'][0])
-    # data = make_request(url)
-    # pl = data.replace(chr(13),chr(10)).replace(chr(10)*3,chr(10)).replace(chr(10)*2,chr(10))
-    # L=pl.splitlines()
-    playlist = xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-    playlist.clear()
-    playlist.add(url)
-    xbmc.Player(xbmc.PLAYER_CORE_AUTO).play(playlist)  # (url, item)
+    liz = xbmcgui.ListItem(name, iconImage='DefaultVideo.png', thumbnailImage=thumbnail)
+    liz.setInfo(type='Video', infoLabels={'Title': name, 'Plot': plot})
+    ok = xbmcplugin.addDirectoryItem(handle=addon_handle, url=master_m3u8, listitem=liz)
 
 else:
     url = '%s/shows' % ZEEMARATHI_REFERRER
